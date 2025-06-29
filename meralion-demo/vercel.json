@@ -1,6 +1,7 @@
 {
   "functions": {
-    "api/scrape/route.ts": {
+    "api/scrape/*": {
+      "includeFiles": "node_modules/@sparticuz/chromium/**",
       "memory": 1024,
       "maxDuration": 10
     }
