@@ -117,7 +117,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const filename = (file as any).name as string | undefined;
+  const filename = file.name as string | undefined;
   if (filename && !allowedExtensions.some((ext) => filename.endsWith(ext))) {
     return new Response(
       JSON.stringify({ error: "Only MP3 or WAV files are allowed." }),
