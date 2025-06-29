@@ -28,7 +28,7 @@ export async function GET(req: Request) {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error(error);
     return new Response(JSON.stringify({ error: "Error scraping the page" }), {
       status: 500,
