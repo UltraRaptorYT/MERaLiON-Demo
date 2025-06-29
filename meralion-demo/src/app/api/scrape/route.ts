@@ -1,26 +1,27 @@
 import chromium from "@sparticuz/chromium";
-import type { Browser } from "puppeteer-core";
 
-let puppeteer: any;
-
-if (process.env.NODE_ENV === "development") {
-  puppeteer = require("puppeteer"); // Full Puppeteer in dev (uses installed Chrome)
-} else {
-  puppeteer = require("puppeteer-core"); // Lightweight version for production
-}
+let puppeteer: typeof import("puppeteer") | typeof import("puppeteer-core");
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const url = searchParams.get("url") || "https://example.com";
+  if (process.env.NODE_ENV === "development") {
+    const puppeteerModule = await import("puppeteer");
+    puppeteer = puppeteerModule;
+  } else {
+    const puppeteerModule = await import("puppeteer-core");
+    puppeteer = puppeteerModule;
+  }
 
-  let browser: Browser | null = null;
+  const { searchParams } = new URL(req.url);
+  const url = searchParams.get("url") || "https://meralion.org/demo/";
+
+  let browser: any = null; // ✅ Relax the type to fix the error
 
   try {
     browser = await puppeteer.launch({
       args: process.env.NODE_ENV === "development" ? [] : chromium.args,
       executablePath:
         process.env.NODE_ENV === "development"
-          ? undefined // Use locally installed Chrome
+          ? undefined
           : await chromium.executablePath(),
       headless: true,
     });
@@ -33,9 +34,34 @@ export async function GET(req: Request) {
     await page.setViewport({ width: 1280, height: 720 });
     await page.goto(url, { waitUntil: "domcontentloaded" });
 
-    const pageTitle = await page.title();
+    await page.waitForSelector('[aria-label="Instruction..."]');
+    await page.type('[aria-label="Instruction..."]', "What is ur name?");
+    await page.keyboard.press("Enter");
 
-    return new Response(JSON.stringify({ title: pageTitle }), {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    await page.waitForSelector('[data-testid="stChatMessage"]');
+    const messages = await page.$$('[data-testid="stChatMessage"]');
+
+    if (messages.length === 0) {
+      console.log("No chat messages found.");
+      return new Response(
+        JSON.stringify({ error: "No chat messages found." }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const lastMessageText = await page.evaluate(
+      (el: HTMLElement) => el.innerText,
+      messages[messages.length - 1]
+    );
+
+    console.log("Last chat message:", lastMessageText);
+
+    return new Response(JSON.stringify({ lastMessage: lastMessageText }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
