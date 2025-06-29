@@ -263,8 +263,6 @@ export async function POST(req: Request) {
       );
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 10000));
-
     const lastMessageData = await page.evaluate((el: HTMLElement) => {
       const audioElement = el.querySelector("audio") as HTMLAudioElement | null;
       return {
