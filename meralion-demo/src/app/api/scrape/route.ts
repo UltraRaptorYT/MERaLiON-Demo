@@ -25,6 +25,7 @@ export async function GET(req: Request) {
           ? undefined
           : await chromium.executablePath(),
       headless: true,
+      protocolTimeout: 0,
     });
 
     if (browser == null) {
@@ -116,6 +117,7 @@ export async function POST(req: Request) {
           ? undefined
           : await chromium.executablePath(),
       headless: true,
+      protocolTimeout: 0,
     });
 
     if (browser == null) {
