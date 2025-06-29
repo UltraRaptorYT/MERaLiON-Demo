@@ -95,12 +95,37 @@ export async function POST(req: Request) {
 
   const formData = await req.formData();
   const file = formData.get("file");
+  const lang = formData.get("lang")?.toString().trim() || "";
+
+  const allowedTypes = ["audio/mpeg", "audio/wav", "audio/wave"];
+  const allowedExtensions = [".mp3", ".wav"];
 
   if (!file || !(file instanceof Blob)) {
     return new Response(JSON.stringify({ error: "No valid file uploaded." }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  if (!allowedTypes.includes(file.type)) {
+    return new Response(
+      JSON.stringify({ error: "Only MP3 or WAV files are allowed." }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  const filename = (file as any).name as string | undefined;
+  if (filename && !allowedExtensions.some((ext) => filename.endsWith(ext))) {
+    return new Response(
+      JSON.stringify({ error: "Only MP3 or WAV files are allowed." }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 
   const arrayBuffer = await file.arrayBuffer();
@@ -158,15 +183,71 @@ export async function POST(req: Request) {
 
     await inputUploadHandle.uploadFile(tempFilePath);
 
-    // ✅ Type instruction
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-    await page.waitForSelector('[aria-label="Instruction..."]');
-    await page.type(
-      '[aria-label="Instruction..."]',
-      "Please translate this speech to Mandarin"
+    await page.waitForSelector('[aria-modal="true"]', { hidden: true });
+
+    await page.waitForSelector('[data-testid="stBaseButton-pills"]');
+    // Find all pill buttons
+    const buttons = await page.$$('[data-testid="stBaseButton-pills"]');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let matchedButton: any = undefined;
+
+    for (const button of buttons) {
+      const buttonText = await page.evaluate(
+        (el: Element) => (el as HTMLElement).textContent?.trim().toLowerCase(),
+        button
+      );
+      if (buttonText.includes(lang.trim().toLowerCase())) {
+        matchedButton = button;
+        break;
+      }
+    }
+
+    if (matchedButton) {
+      console.log(`Found button for language: ${lang}`);
+      await matchedButton.click();
+    } else {
+      console.log(`No button found for language: ${lang}, typing instead.`);
+      await page.waitForSelector('[aria-label="Instruction..."]');
+      await page.type(
+        '[aria-label="Instruction..."]',
+        `Please translate this speech to ${lang}`
+      );
+      await page.keyboard.press("Enter");
+    }
+
+    console.log("WAIT");
+
+    // Think
+    await page.waitForFunction(
+      () => {
+        const indicators = Array.from(document.querySelectorAll(".e12gfcky1"));
+        return indicators.some((indicator) => {
+          const children = indicator.parentElement?.children || [];
+          const sibling = [...children].slice(-1)[0];
+          return (
+            sibling && sibling.textContent?.toLowerCase().includes("thinking")
+          );
+        });
+      },
+      { timeout: 0 }
     );
-    await page.keyboard.press("Enter");
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    console.log("THINKING DETECTED");
+    await page.waitForSelector(".e12gfcky1", { hidden: true });
+
+    if (matchedButton) {
+      console.log("WAITING FOR 2 AUDIO ELEMENTS...");
+
+      await page.waitForFunction(
+        () => {
+          return document.querySelectorAll("audio").length >= 2;
+        },
+        { timeout: 0 }
+      );
+    }
+
+    console.log("DONE WAIT");
 
     await page.waitForSelector('[data-testid="stChatMessage"]');
     const messages = await page.$$('[data-testid="stChatMessage"]');
@@ -181,15 +262,17 @@ export async function POST(req: Request) {
         }
       );
     }
+    const lastMessageData = await page.evaluate((el: HTMLElement) => {
+      const audioElement = el.querySelector("audio") as HTMLAudioElement | null;
+      return {
+        text: el.innerText,
+        audioSrc: audioElement ? audioElement.src : null,
+      };
+    }, messages[messages.length - 1]);
 
-    const lastMessageText = await page.evaluate(
-      (el: HTMLElement) => el.innerText,
-      messages[messages.length - 1]
-    );
+    console.log("Last chat message with audio:", lastMessageData);
 
-    console.log("Last chat message:", lastMessageText);
-
-    return new Response(JSON.stringify({ lastMessage: lastMessageText }), {
+    return new Response(JSON.stringify(lastMessageData), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
