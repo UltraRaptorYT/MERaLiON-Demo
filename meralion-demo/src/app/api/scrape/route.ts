@@ -1,6 +1,13 @@
 import chromium from "@sparticuz/chromium";
-import puppeteer from "puppeteer-core";
 import type { Browser } from "puppeteer-core";
+
+let puppeteer: any;
+
+if (process.env.NODE_ENV === "development") {
+  puppeteer = require("puppeteer"); // Full Puppeteer in dev (uses installed Chrome)
+} else {
+  puppeteer = require("puppeteer-core"); // Lightweight version for production
+}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -10,13 +17,17 @@ export async function GET(req: Request) {
 
   try {
     browser = await puppeteer.launch({
-      args: chromium.args,
+      args: process.env.NODE_ENV === "development" ? [] : chromium.args,
       executablePath:
         process.env.NODE_ENV === "development"
-          ? undefined // use locally installed Chrome in dev
+          ? undefined // Use locally installed Chrome
           : await chromium.executablePath(),
       headless: true,
     });
+
+    if (browser == null) {
+      throw Error("Browser Not Opened");
+    }
 
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 720 });
