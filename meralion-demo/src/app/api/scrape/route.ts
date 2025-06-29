@@ -14,7 +14,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const url = searchParams.get("url") || "https://meralion.org/demo/";
 
-  let browser: any = null; // ✅ Relax the type to fix the error
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let browser: any = null;
 
   try {
     browser = await puppeteer.launch({
