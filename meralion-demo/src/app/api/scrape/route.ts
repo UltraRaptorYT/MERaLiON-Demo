@@ -216,25 +216,36 @@ export async function POST(req: Request) {
       await page.keyboard.press("Enter");
     }
 
-    console.log("WAIT");
+    console.log("WAITING FOR THINKING OR TIMEOUT...");
 
-    // Think
-    await page.waitForFunction(
-      () => {
-        const indicators = Array.from(document.querySelectorAll(".e12gfcky1"));
-        return indicators.some((indicator) => {
-          const children = indicator.parentElement?.children || [];
-          const sibling = [...children].slice(-1)[0];
-          return (
-            sibling && sibling.textContent?.toLowerCase().includes("thinking")
-          );
-        });
-      },
-      { timeout: 0 }
-    );
+    const thinkingDetected = await Promise.race([
+      page
+        .waitForFunction(
+          () => {
+            const indicators = Array.from(
+              document.querySelectorAll(".e12gfcky1")
+            );
+            return indicators.some((indicator) => {
+              const children = indicator.parentElement?.children || [];
+              const sibling = [...children].slice(-1)[0];
+              return (
+                sibling &&
+                sibling.textContent?.toLowerCase().includes("thinking")
+              );
+            });
+          },
+          { timeout: 0 }
+        )
+        .then(() => true),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1000)),
+    ]);
 
-    console.log("THINKING DETECTED");
-    await page.waitForSelector(".e12gfcky1", { hidden: true });
+    if (thinkingDetected) {
+      console.log("THINKING DETECTED");
+      await page.waitForSelector(".e12gfcky1", { hidden: true });
+    } else {
+      console.log("THINKING NOT DETECTED, BYPASSING...");
+    }
 
     if (matchedButton) {
       console.log("WAITING FOR 2 AUDIO ELEMENTS...");

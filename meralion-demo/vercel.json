@@ -2,7 +2,6 @@
   "functions": {
     "src/app/api/scrape/*": {
       "includeFiles": "node_modules/@sparticuz/chromium/**",
-      "memory": 1024,
       "maxDuration": 300
     }
   },
