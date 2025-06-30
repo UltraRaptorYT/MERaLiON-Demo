@@ -247,7 +247,10 @@ export async function POST(req: Request) {
       console.log("THINKING NOT DETECTED, BYPASSING...");
     }
 
-    if (matchedButton) {
+    if (
+      matchedButton &&
+      !["transcribe", "summarise"].includes(lang.trim().toLowerCase())
+    ) {
       console.log("WAITING FOR 2 AUDIO ELEMENTS...");
 
       await page.waitForFunction(
